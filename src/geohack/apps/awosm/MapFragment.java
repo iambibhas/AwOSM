@@ -3,8 +3,10 @@ package geohack.apps.awosm;
 import java.util.Arrays;
 
 import org.apache.http.Header;
+import org.osmdroid.util.BoundingBoxE6;
 import org.osmdroid.util.GeoPoint;
 import org.osmdroid.views.MapView;
+import org.osmdroid.views.Projection;
 import org.osmdroid.views.overlay.compass.CompassOverlay;
 import org.osmdroid.views.overlay.mylocation.GpsMyLocationProvider;
 import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay;
@@ -45,7 +47,7 @@ public class MapFragment extends Fragment {
         mapView.setBuiltInZoomControls(true);
         mapView.setMultiTouchControls(true);
         
-        mapView.getController().setZoom(14);
+        mapView.getController().setZoom(16);
         mapView.getController().setCenter(startPoint);
         
         GpsMyLocationProvider imlp = new GpsMyLocationProvider(context);
@@ -66,10 +68,16 @@ public class MapFragment extends Fragment {
 			public boolean onQueryTextSubmit(String query) {
 				// TODO Auto-generated method stub
 				Log.d("Search", query);
+				Projection bbox = mapView.getProjection();
+		    	String strBbox = String.valueOf(bbox.getSouthWest().getLatitude()) + ','
+		    			+ String.valueOf(bbox.getSouthWest().getLongitude()) + ','
+		    			+ String.valueOf(bbox.getNorthEast().getLatitude()) + ','
+		    			+ String.valueOf(bbox.getNorthEast().getLongitude());
+		    	
 				OverpassApiWrapper overpass = new OverpassApiWrapper();
 				overpass.getResults(
 					query,
-					"22.602482178940015,88.41625213623047,22.62549899107,88.44642162322997",
+					strBbox,
 					new AsyncHttpResponseHandler() {
 						
 						@Override
