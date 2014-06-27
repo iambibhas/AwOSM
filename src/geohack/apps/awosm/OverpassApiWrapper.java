@@ -3,6 +3,7 @@ package geohack.apps.awosm;
 import java.io.IOException;
 import java.io.StringWriter;
 
+import org.osmdroid.views.Projection;
 import org.xmlpull.v1.XmlSerializer;
 
 import android.util.Log;
@@ -104,7 +105,8 @@ public class OverpassApiWrapper {
 	    return writer.toString();
 	}
 	
-	public void getResults(String query, String bbox, AsyncHttpResponseHandler responseHandler) {
+	public void getResults(String query, Projection bboxProjection, AsyncHttpResponseHandler responseHandler) {
+		String bbox = this.getBboxFromProjection(bboxProjection);
 		String xml = this.getXmlFromQuery(query, bbox);
 		Log.d("OverPass XML", xml);
 		
@@ -112,5 +114,12 @@ public class OverpassApiWrapper {
 		RequestParams params = new RequestParams();
 		params.put("data", xml);
 		client.post(this.baseUrl, params, responseHandler);
+	}
+	
+	public String getBboxFromProjection(Projection bboxProjection) {
+		return String.valueOf(bboxProjection.getSouthWest().getLatitude()) + ','
+		+ String.valueOf(bboxProjection.getSouthWest().getLongitude()) + ','
+		+ String.valueOf(bboxProjection.getNorthEast().getLatitude()) + ','
+		+ String.valueOf(bboxProjection.getNorthEast().getLongitude());
 	}
 }

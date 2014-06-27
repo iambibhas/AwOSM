@@ -68,16 +68,12 @@ public class MapFragment extends Fragment {
 			public boolean onQueryTextSubmit(String query) {
 				// TODO Auto-generated method stub
 				Log.d("Search", query);
-				Projection bbox = mapView.getProjection();
-		    	String strBbox = String.valueOf(bbox.getSouthWest().getLatitude()) + ','
-		    			+ String.valueOf(bbox.getSouthWest().getLongitude()) + ','
-		    			+ String.valueOf(bbox.getNorthEast().getLatitude()) + ','
-		    			+ String.valueOf(bbox.getNorthEast().getLongitude());
+				Projection bboxProjection = mapView.getProjection();
 		    	
 				OverpassApiWrapper overpass = new OverpassApiWrapper();
 				overpass.getResults(
 					query,
-					strBbox,
+					bboxProjection,
 					new AsyncHttpResponseHandler() {
 						
 						@Override
