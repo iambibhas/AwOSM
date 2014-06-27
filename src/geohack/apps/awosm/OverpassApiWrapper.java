@@ -2,7 +2,9 @@ package geohack.apps.awosm;
 
 import java.io.IOException;
 import java.io.StringWriter;
+import java.util.Locale;
 
+import org.osmdroid.util.BoundingBoxE6;
 import org.osmdroid.views.Projection;
 import org.xmlpull.v1.XmlSerializer;
 
@@ -37,9 +39,18 @@ public class OverpassApiWrapper {
 	public String outputFormat = "json";
 	public Integer timeout = 25;
 	
-	public String getXmlFromQuery(String query, String bbox) {
+	public String getXmlFromQuery(String query, Projection bboxProjection) {
 		XmlSerializer xmlSerializer = Xml.newSerializer();
 	    StringWriter writer = new StringWriter();
+	    
+	    String regexQuery = "("
+	    	+ query
+	    	+ "|" 
+	    	+ query.toLowerCase(Locale.getDefault()) 
+	    	+ "|" 
+	    	+ query.toUpperCase(Locale.getDefault())
+	    	+ ")";
+	    String amenityQuery = query.toLowerCase(Locale.getDefault()).replace(" ", "_");
 	    
 	    try {
 	    	xmlSerializer.setOutput(writer);
@@ -51,33 +62,8 @@ public class OverpassApiWrapper {
 			
 			xmlSerializer.startTag("", "union");
 			
-			xmlSerializer.startTag("", "query");
-			xmlSerializer.attribute("", "type", "node");
-			xmlSerializer.startTag("", "has-kv");
-			xmlSerializer.attribute("", "k", "name");
-			xmlSerializer.attribute("", "v", query);
-			xmlSerializer.endTag("", "has-kv");
-			xmlSerializer.startTag("", "bbox-query");
-			xmlSerializer.attribute("", "s", bbox.split(",")[0]);
-			xmlSerializer.attribute("", "w", bbox.split(",")[1]);
-			xmlSerializer.attribute("", "n", bbox.split(",")[2]);
-			xmlSerializer.attribute("", "e", bbox.split(",")[3]);
-			xmlSerializer.endTag("", "bbox-query");
-			xmlSerializer.endTag("", "query");
-			
-			xmlSerializer.startTag("", "query");
-			xmlSerializer.attribute("", "type", "node");
-			xmlSerializer.startTag("", "has-kv");
-			xmlSerializer.attribute("", "k", "amenity");
-			xmlSerializer.attribute("", "v", query);
-			xmlSerializer.endTag("", "has-kv");
-			xmlSerializer.startTag("", "bbox-query");
-			xmlSerializer.attribute("", "s", bbox.split(",")[0]);
-			xmlSerializer.attribute("", "w", bbox.split(",")[1]);
-			xmlSerializer.attribute("", "n", bbox.split(",")[2]);
-			xmlSerializer.attribute("", "e", bbox.split(",")[3]);
-			xmlSerializer.endTag("", "bbox-query");
-			xmlSerializer.endTag("", "query");
+			this.addNodeToQuery(xmlSerializer, true, "name", regexQuery, bboxProjection);
+			this.addNodeToQuery(xmlSerializer, true, "amenity", amenityQuery, bboxProjection);
 			
 			xmlSerializer.endTag("", "union");
 
@@ -106,8 +92,7 @@ public class OverpassApiWrapper {
 	}
 	
 	public void getResults(String query, Projection bboxProjection, AsyncHttpResponseHandler responseHandler) {
-		String bbox = this.getBboxFromProjection(bboxProjection);
-		String xml = this.getXmlFromQuery(query, bbox);
+		String xml = this.getXmlFromQuery(query, bboxProjection);
 		Log.d("OverPass XML", xml);
 		
 		AsyncHttpClient client = new AsyncHttpClient();
@@ -116,10 +101,40 @@ public class OverpassApiWrapper {
 		client.post(this.baseUrl, params, responseHandler);
 	}
 	
-	public String getBboxFromProjection(Projection bboxProjection) {
-		return String.valueOf(bboxProjection.getSouthWest().getLatitude()) + ','
-		+ String.valueOf(bboxProjection.getSouthWest().getLongitude()) + ','
-		+ String.valueOf(bboxProjection.getNorthEast().getLatitude()) + ','
-		+ String.valueOf(bboxProjection.getNorthEast().getLongitude());
+	private void addNodeToQuery(XmlSerializer xmlSerializer, Boolean regex, String key, String value, Projection bboxProjection) {
+		try {
+			String[] types = {"node", "way", "relation"};
+			for (String type : types) {
+				xmlSerializer.startTag("", "query");
+				xmlSerializer.attribute("", "type", type);
+				xmlSerializer.startTag("", "has-kv");
+				xmlSerializer.attribute("", "k", key);
+				
+				if (regex) {
+					xmlSerializer.attribute("", "regv", value);
+				} else {
+					xmlSerializer.attribute("", "v", value);
+				}
+				
+				xmlSerializer.endTag("", "has-kv");
+				xmlSerializer.startTag("", "bbox-query");
+				xmlSerializer.attribute("", "s", String.valueOf(bboxProjection.getSouthWest().getLatitude()));
+				xmlSerializer.attribute("", "w", String.valueOf(bboxProjection.getSouthWest().getLongitude()));
+				xmlSerializer.attribute("", "n", String.valueOf(bboxProjection.getNorthEast().getLatitude()));
+				xmlSerializer.attribute("", "e", String.valueOf(bboxProjection.getNorthEast().getLongitude()));
+				xmlSerializer.endTag("", "bbox-query");
+				xmlSerializer.endTag("", "query");
+			}
+			
+		} catch (IllegalArgumentException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IllegalStateException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 	}
 }
