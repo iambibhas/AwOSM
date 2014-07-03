@@ -6,13 +6,21 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.util.ArrayList;
 import java.util.Arrays;
 
 import org.apache.http.Header;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+import org.osmdroid.DefaultResourceProxyImpl;
+import org.osmdroid.ResourceProxy;
 import org.osmdroid.util.BoundingBoxE6;
 import org.osmdroid.util.GeoPoint;
 import org.osmdroid.views.MapView;
 import org.osmdroid.views.Projection;
+import org.osmdroid.views.overlay.OverlayItem;
+import org.osmdroid.views.overlay.ItemizedIconOverlay;
 import org.osmdroid.views.overlay.compass.CompassOverlay;
 import org.osmdroid.views.overlay.mylocation.GpsMyLocationProvider;
 import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay;
@@ -20,10 +28,12 @@ import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay;
 import com.loopj.android.http.AsyncHttpResponseHandler;
 
 import android.content.Context;
+import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.support.v4.app.Fragment;
 import android.widget.SearchView;
 import android.widget.SearchView.OnQueryTextListener;
+import android.widget.Toast;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -36,6 +46,8 @@ import android.view.ViewGroup;
 public class MapFragment extends Fragment {
     private MyLocationNewOverlay mLocationOverlay;
     private CompassOverlay mCompassOverlay;
+    private NodeItemizedOverlay mItemizedOverlay;
+    private MapView mapView;
 
     public MapFragment() {
     }
@@ -85,7 +97,7 @@ public class MapFragment extends Fragment {
         final Context context = rootView.getContext();
         GeoPoint startPoint = new GeoPoint(22.4109, 88.6216);
 
-        final MapView mapView = (MapView) rootView.findViewById(R.id.mapview);
+        mapView = (MapView) rootView.findViewById(R.id.mapview);
         mapView.setBuiltInZoomControls(true);
         mapView.setMultiTouchControls(true);
 
@@ -108,26 +120,37 @@ public class MapFragment extends Fragment {
 
             @Override
             public boolean onQueryTextSubmit(String query) {
-                // TODO Auto-generated method stub
+                // Executed when you press Search after entering text
                 Log.d("Search", query);
                 Projection bboxProjection = mapView.getProjection();
 
                 OverpassApiWrapper overpass = new OverpassApiWrapper();
-                overpass.getResults(query, bboxProjection, new AsyncHttpResponseHandler() {
+                overpass.getResults(query.trim(), bboxProjection, new AsyncHttpResponseHandler() {
 
                     @Override
                     public void onSuccess(int statusCode, Header[] headers, byte[] response) {
-                        // TODO Auto-generated method stub
+                        // API Call was successful. Parse JSON and do stuff
                         String jsonResponse = new String(response);
-                        Log.d("API", jsonResponse);
+                        try {
+                            JSONObject jObject = new JSONObject(jsonResponse);
+                            JSONArray jArray = jObject.getJSONArray("elements");
+                            if (jArray.length() > 0) {
+                                drawResults(jArray);
+                            }
+                        } catch (JSONException e) {
+                            e.printStackTrace();
+                        }
+                        // Log.d("API", jsonResponse);
                     }
 
                     @Override
                     public void onFailure(int statusCode, Header[] headers, byte[] errorResponse,
                             Throwable e) {
-                        // TODO Auto-generated method stub
-
+                        // API call failed
+                        
                         String error = Arrays.toString(errorResponse);
+                        
+                        Toast.makeText(context, error, Toast.LENGTH_SHORT).show();
                         Log.d("API Error", String.valueOf(statusCode));
                         Log.d("API Error", error);
                     }
@@ -137,12 +160,48 @@ public class MapFragment extends Fragment {
 
             @Override
             public boolean onQueryTextChange(String newText) {
-                // TODO Auto-generated method stub
+                // Fire every time the text field's value changes
                 return false;
             }
         });
 
         return rootView;
+    }
+    
+    public void drawResults(JSONArray elements) {
+        // We've got a list of nodes, draw some markers
+        final Context context = getActivity().getApplicationContext();
+        ResourceProxy mResourceProxy = new DefaultResourceProxyImpl(context);
+        mapView = (MapView) getActivity().findViewById(R.id.mapview);
+        Drawable drawable = this.getResources().getDrawable(R.drawable.marker);
+        mItemizedOverlay = new NodeItemizedOverlay(drawable, mResourceProxy);
+        mapView.getOverlays().add(mItemizedOverlay);
+        
+        ArrayList<OverlayItem> mItems = new ArrayList<OverlayItem>();
+        
+        for (int i = 0; i < elements.length(); i++) {
+            try {
+                JSONObject oneObject = elements.getJSONObject(i);
+                
+                if (oneObject.getString("type").equalsIgnoreCase("node") && oneObject.has("tags")) {
+                    JSONObject tags = oneObject.getJSONObject("tags");
+                    
+                    mItemizedOverlay.addItem(
+                        new GeoPoint(oneObject.getDouble("lat"), oneObject.getDouble("lon")),
+                        tags.getString("name"),
+                        ""
+                    );
+                    Log.d("API", "Adding Overlay " + tags.getString("name"));
+                } else {
+                    Log.d("API", "I'm in Else block");
+                }
+            } catch (Exception e) {
+                // TODO: handle exception
+                e.printStackTrace();
+            }
+        }
+        
+        
     }
 
     @Override
@@ -157,6 +216,18 @@ public class MapFragment extends Fragment {
         super.onPause();
         mLocationOverlay.disableMyLocation();
         mLocationOverlay.disableFollowLocation();
+    }
+    
+    public static GeoPoint coordinatesToGeoPoint(double[] coords) {
+        if (coords.length > 2) {
+            return null;
+        }
+        if (coords[0] == Double.NaN || coords[1] == Double.NaN) {
+            return null;
+        }
+        final int latitude = (int) (coords[0] * 1E6);
+        final int longitude = (int) (coords[1] * 1E6);
+        return new GeoPoint(latitude, longitude);
     }
 
 }

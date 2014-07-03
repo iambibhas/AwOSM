@@ -35,9 +35,9 @@ import com.loopj.android.http.*;
 
 public class OverpassApiWrapper {
     public String baseUrl = "http://overpass-api.de/api/interpreter";
-    public String outputFormat = "xml";
+    public String outputFormat = "json";
     public Integer timeout = 25;
-
+    
     public String getXmlFromQuery(String query, Projection bboxProjection) {
         XmlSerializer xmlSerializer = Xml.newSerializer();
         StringWriter writer = new StringWriter();
